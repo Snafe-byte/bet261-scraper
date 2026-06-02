@@ -2,55 +2,59 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Snafe-byte Pro Predictor</title>
+    <title>Snafe-byte Predictor</title>
     <style>
         :root { --primary: #6366f1; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
         body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: var(--text); display: flex; justify-content: center; padding: 20px; }
         .dashboard { background: var(--card); padding: 25px; border-radius: 16px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         h2 { text-align: center; color: var(--primary); margin-bottom: 20px; }
-        input, select, button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #475569; background: #334155; color: white; }
-        button { background: var(--primary); font-weight: bold; cursor: pointer; border: none; }
+        select, input, button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #475569; background: #334155; color: white; }
+        button { background: var(--primary); font-weight: bold; cursor: pointer; border: none; margin-top: 10px; }
         .res { margin-top: 20px; padding: 15px; border-radius: 10px; background: #0f172a; font-size: 0.9em; line-height: 1.6; }
     </style>
 </head>
 <body>
     <div class="dashboard">
         <h2>Snafe-byte Predictor</h2>
+        
+        <select id="homeTeam"></select>
+        <select id="awayTeam"></select>
+        
         <input type="number" id="c1" placeholder="Cote 1" step="0.01">
         <input type="number" id="cX" placeholder="Cote X" step="0.01">
         <input type="number" id="c2" placeholder="Cote 2" step="0.01">
-        <button onclick="calculer()">Analyser la tendance</button>
+        
+        <button onclick="calculer()">Analyser</button>
+        
         <div id="res" class="res">Entrez les cotes pour voir l'analyse.</div>
     </div>
 
     <script>
+        // Liste des équipes
+        const teams = ["Liverpool", "London Reds", "Manchester Blue", "Brighton", "Brentford", "A. Villa", "Newcastle", "Everton", "Spurs", "West Ham", "Manchester Red", "Fulham", "London Blues", "C. Palace", "N. Forest", "Wolverhampton", "Burnley", "Bournemouth", "Leeds", "Sunderland"];
+        
+        const hSelect = document.getElementById('homeTeam');
+        const aSelect = document.getElementById('awayTeam');
+        
+        teams.forEach(t => {
+            hSelect.innerHTML += `<option>${t}</option>`;
+            aSelect.innerHTML += `<option>${t}</option>`;
+        });
+
         function calculer() {
+            const h = hSelect.value;
+            const a = aSelect.value;
             const c1 = parseFloat(document.getElementById('c1').value);
-            const cX = parseFloat(document.getElementById('cX').value);
-            const c2 = parseFloat(document.getElementById('c2').value);
             const res = document.getElementById('res');
 
-            if(!c1 || !cX || !c2) { res.innerText = "Veuillez remplir les 3 cotes."; return; }
+            if(!c1) { res.innerText = "Remplissez les cotes."; return; }
 
-            let verdict = "";
-            let risque = "";
-            let buts = "Tendance Buts : Probable Over 2.5";
-
-            // Logique basée sur tes observations de volatilité
-            if (c1 < 1.35) {
-                verdict = "Victoire Favori (High Conf)";
-                risque = "Risque Faible";
-            } else if (c1 >= 1.35 && c1 <= 1.60) {
-                verdict = "Favori Fragile (Piège)";
-                risque = "Risque Élevé - Privilégier Double Chance";
-            } else {
-                verdict = "Match Volatile";
-                risque = "Risque Très Élevé - Variance constatée";
-            }
-
-            res.innerHTML = `<strong>Analyse :</strong> ${verdict}<br>
-                             <strong>Niveau de risque :</strong> ${risque}<br>
-                             <strong>Stratégie :</strong> ${buts}`;
+            let verdict = (c1 < 1.35) ? "Victoire Favori (High Conf)" : 
+                          (c1 <= 1.60) ? "Favori Fragile (Piège)" : "Match Volatile";
+            
+            res.innerHTML = `<strong>Match :</strong> ${h} vs ${a}<br>
+                             <strong>Analyse :</strong> ${verdict}<br>
+                             <strong>Stratégie :</strong> ${c1 < 1.40 ? "Probable Over 2.5" : "Prudence conseillée"}`;
         }
     </script>
 </body>
