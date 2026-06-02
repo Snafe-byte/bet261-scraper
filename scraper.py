@@ -1,34 +1,64 @@
 import os
 import json
 import urllib.request
+from datetime import datetime
 
 # Récupération des clés Supabase cachées dans GitHub
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 def fetch_bet261_virtuals():
-    print("Connexion au flux des matchs virtuels...")
+    print("Connexion aux serveurs de Bet261.mg pour récupérer les vrais matchs...")
     
-    # Nouvelle URL de simulation 100% stable au format Bet261
-    url = "https://raw.githubusercontent.com/smooland/mock-sports-api/main/bet261_mock.json"
+    # URL du flux public des sports virtuels de Bet261
+    url = "https://m.bet261.mg/api/sports/virtual/fixtures"
+    
+    # En-têtes pour simuler un vrai navigateur et éviter d'être bloqué
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'application/json',
+        'Origin': 'https://bet261.mg',
+        'Referer': 'https://bet261.mg/'
+    }
     
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        with urllib.request.urlopen(req) as response:
+        req = urllib.request.Request(url, headers=headers)
+        with urllib.request.urlopen(req, timeout=15) as response:
             data = json.loads(response.read().decode())
-            print(f"Matchs trouvés : {len(data.get('matches', []))}")
-            return data.get("matches", [])
+            
+            # Extraction des matchs selon la structure de Bet261
+            raw_matches = data.get("data", []) or data.get("fixtures", [])
+            print(f"Vrais matchs trouvés sur Bet261 : {len(raw_matches)}")
+            
+            cleaned_matches = []
+            for match in raw_matches:
+                # On extrait les données importantes en s'adaptant à leur structure
+                match_id = match.get("id") or match.get("fixtureId")
+                home_team = match.get("homeTeam", "Équipe A")
+                away_team = match.get("awayTeam", "Équipe B")
+                
+                # Récupération des cotes (Odds) 1X2
+                odds_data = match.get("odds", {})
+                odds = {
+                    "home": odds_data.get("1", odds_data.get("home", 2.00)),
+                    "draw": odds_data.get("X", odds_data.get("draw", 3.00)),
+                    "away": odds_data.get("2", odds_data.get("away", 2.00))
+                }
+                
+                cleaned_matches.append({
+                    "id": match_id,
+                    "teams": f"{home_team} vs {away_team}",
+                    "odds": odds
+                })
+            return cleaned_matches
+
     except Exception as e:
-        print(f"Erreur de lecture : {e}")
-        # Données de secours directes si internet coupe
-        return [
-            {"id": 9991, "teams": "Arsenal vs Chelsea", "odds": {"home": 2.10, "draw": 3.40, "away": 2.90}},
-            {"id": 9992, "teams": "Real Madrid vs Barcelona", "odds": {"home": 1.95, "draw": 3.60, "away": 3.20}}
-        ]
+        print(f"Erreur lors de la récupération des vrais matchs : {e}")
+        return []
 
 def send_to_supabase(matches):
     if not matches:
-        print("Aucun match à envoyer.")
+        print("Aucun match récupéré. Rien à envoyer à Supabase.")
         return
 
     for match in matches:
@@ -36,20 +66,26 @@ def send_to_supabase(matches):
         teams = match.get("teams")
         odds = match.get("odds", {})
         
-        # Simulation d'un prono IA ultra-rapide basé sur les cotes
-        prediction = "Victoire Domicile conseillée" if odds.get("home", 0) < odds.get("away", 0) else "Match serré / Double Chance"
+        # Calcul du pronostic IA basé sur les vraies cotes
+        home_odd = odds.get("home", 0)
+        away_odd = odds.get("away", 0)
+        if home_odd < away_odd and home_odd < 2.20:
+            prediction = "Victoire Domicile"
+        elif away_odd < home_odd and away_odd < 2.20:
+            prediction = "Victoire À l'extérieur"
+        else:
+            prediction = "Match serré - Double Chance"
 
         payload = {
             "match_id": str(match_id),
             "teams": teams,
-            "odds_home": odds.get("home"),
+            "odds_home": home_odd,
             "odds_draw": odds.get("draw"),
-            "odds_away": odds.get("away"),
+            "odds_away": away_odd,
             "prediction": f"Gemini IA : {prediction}",
             "status": "pending"
         }
 
-        # Envoi ou mise à jour (Upsert) dans Supabase
         supabase_url = f"{SUPABASE_URL}/rest/v1/virtual_matches"
         req_url = f"{supabase_url}?match_id=eq.{match_id}"
         
@@ -68,9 +104,9 @@ def send_to_supabase(matches):
         
         try:
             with urllib.request.urlopen(req) as response:
-                print(f"Match synchronisé avec succès : {teams}")
+                print(f"Vrai match synchronisé : {teams}")
         except Exception as e:
-            print(f"Erreur d'envoi Supabase : {e}")
+            print(f"Erreur d'envoi Supabase pour {teams} : {e}")
 
 if __name__ == "__main__":
     matches = fetch_bet261_virtuals()
