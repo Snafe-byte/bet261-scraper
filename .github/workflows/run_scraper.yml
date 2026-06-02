@@ -2,23 +2,28 @@ name: Bet261 Live Robot Scraper
 
 on:
   schedule:
-    - cron: '*/2 * * * *' # S'exécute toutes les 2 minutes
-  workflow_dispatch: # Permet de le lancer à la main pour tester
+    - cron: '*/2 * * * *' # Tourne toutes les 2 minutes
+  workflow_dispatch: # Permet de le lancer manuellement
 
 jobs:
   scrape:
     runs-on: ubuntu-latest
     steps:
-    - name: Récupérer le code
-      uses: actions/checkout@v3
+      - name: Récupérer le code
+        uses: actions/checkout@v3
 
-    - name: Installer Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.10'
+      - name: Installer Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-    - name: Lancer le robot Scraper
-      env:
-        SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-        SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
-      run: python scraper.py
+      - name: Installer les dépendances anti-blocage
+        run: |
+          pip install playwright supabase
+          playwright install chromium
+
+      - name: Lancer le robot Scraper
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
+        run: python scraper.py
