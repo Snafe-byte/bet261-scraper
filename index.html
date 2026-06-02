@@ -1,0 +1,50 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Snafe-byte Admin Tool</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; }
+        .box { border: 1px solid #ccc; padding: 15px; border-radius: 8px; max-width: 400px; }
+        #resultat { margin-top: 15px; padding: 10px; font-weight: bold; border-radius: 4px; }
+    </style>
+</head>
+<body>
+    <div class="box">
+        <h2>Snafe-byte Admin</h2>
+        <select id="homeTeam"></select> vs <select id="awayTeam"></select><br><br>
+        Cotes: <br>
+        <input type="number" id="c1" placeholder="Cote 1" step="0.01">
+        <input type="number" id="cX" placeholder="Cote X" step="0.01">
+        <input type="number" id="c2" placeholder="Cote 2" step="0.01"><br><br>
+        <button onclick="analyserMatch()">Analyser le risque</button>
+        <div id="resultat"></div>
+    </div>
+
+    <script>
+        const teams = ["Liverpool", "London Reds", "Manchester Blue", "Brighton", "Brentford", "A. Villa", "Newcastle", "Everton", "Spurs", "West Ham", "Manchester Red", "Fulham", "London Blues", "C. Palace", "N. Forest", "Wolverhampton", "Burnley", "Bournemouth", "Leeds", "Sunderland"];
+        
+        teams.forEach(t => {
+            document.getElementById('homeTeam').innerHTML += `<option>${t}</option>`;
+            document.getElementById('awayTeam').innerHTML += `<option>${t}</option>`;
+        });
+
+        function analyserMatch() {
+            const c1 = parseFloat(document.getElementById('c1').value);
+            const resDiv = document.getElementById('resultat');
+
+            // Logique basée sur tes 50 matchs
+            if (c1 < 1.40) {
+                resDiv.style.backgroundColor = "#ffcccc";
+                resDiv.innerText = "⚠️ RISQUE ÉLEVÉ : Cote trop basse (piège fréquent observé)";
+            } else if (c1 >= 1.60 && c1 <= 1.95) {
+                resDiv.style.backgroundColor = "#ccffcc";
+                resDiv.innerText = "✅ STABLE : Tendance favorable selon l'historique";
+            } else {
+                resDiv.style.backgroundColor = "#ffffcc";
+                resDiv.innerText = "🔍 NEUTRE : Analyser les statistiques récentes";
+            }
+        }
+    </script>
+</body>
+</html>
