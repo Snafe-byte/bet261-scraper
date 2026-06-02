@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Snafe-byte Pro</title>
-    <!-- SDK Gemini pour navigateur -->
-    <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai@0.1.0/dist/index.min.js"></script>
+    <!-- Utilisation du SDK Google Generative AI via un script global -->
+    <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai@0.21.0/dist/index.min.js"></script>
     <style>
         :root { --primary: #6366f1; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
         body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0f172a, #1e1b4b); color: var(--text); padding: 20px; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
@@ -76,13 +76,13 @@
             const file = document.getElementById('imageInput').files[0];
             if (!key || !file) { alert("Clé ou image manquante !"); return; }
             
-            // Correction : Utilisation directe de google.generativeai
-            const genAI = new google.generativeai.GoogleGenerativeAI(key);
+            // Correction : Utilisation de l'objet global généré par le CDN
+            const genAI = new window.google.generativeai.GoogleGenerativeAI(key);
             const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
             const reader = new FileReader();
             reader.onloadend = async () => {
                 const base64Data = reader.result.split(',')[1];
-                const res = await model.generateContent(["Analyse ces résultats et donne le score et les stats.", { inlineData: { data: base64Data, mimeType: "image/png" } }]);
+                const res = await model.generateContent(["Analyse ces résultats de match et donne le score et les stats.", { inlineData: { data: base64Data, mimeType: "image/png" } }]);
                 document.getElementById('resultat').innerHTML = res.response.text();
             };
             reader.readAsDataURL(file);
