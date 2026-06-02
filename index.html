@@ -6,59 +6,70 @@
     <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai@0.1.0/dist/index.min.js"></script>
     <style>
         :root { --primary: #6366f1; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
-        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0f172a, #1e1b4b); color: var(--text); padding: 20px; min-height: 100vh; display: flex; justify-content: center; }
-        .dashboard { background: var(--card); padding: 20px; border-radius: 16px; width: 100%; max-width: 450px; }
-        h2 { text-align: center; color: var(--primary); }
-        .tab-btn { background: #334155; border: none; color: white; padding: 10px; width: 48%; cursor: pointer; border-radius: 5px; }
-        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: none; background: #334155; color: white; }
-        button { background: var(--primary); font-weight: bold; cursor: pointer; }
-        #resultat { margin-top: 20px; padding: 15px; border-radius: 10px; background: #0f172a; border-left: 4px solid var(--primary); }
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0f172a, #1e1b4b); color: var(--text); padding: 20px; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .dashboard { background: var(--card); padding: 25px; border-radius: 16px; width: 100%; max-width: 450px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        h2 { text-align: center; color: var(--primary); margin-bottom: 20px; }
+        .grid-select { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .grid-cotes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+        input, select, button { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #334155; color: white; box-sizing: border-box; }
+        button { background: var(--primary); font-weight: bold; cursor: pointer; border: none; margin-top: 10px; }
+        .result-box { margin-top: 20px; padding: 15px; border-radius: 10px; background: #0f172a; border-left: 4px solid var(--primary); }
     </style>
 </head>
 <body>
     <div class="dashboard">
-        <h2>Snafe-byte Pro</h2>
+        <h2>Snafe-byte Analytics</h2>
         
-        <!-- Configuration clé -->
-        <div style="background: #0f172a; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
-            <input type="password" id="apiKey" placeholder="Ta clé API (enregistrée localement)">
-            <button onclick="saveKey()" style="background:#10b981;">Enregistrer la Clé</button>
+        <div class="grid-select">
+            <select id="homeTeam"></select>
+            <select id="awayTeam"></select>
         </div>
 
-        <button class="tab-btn" onclick="showMode('manual')">Manuel</button>
-        <button class="tab-btn" onclick="showMode('ai')">AI (Screens)</button>
-
-        <div id="manualMode">
-            <input type="number" id="c1" placeholder="Cote Favori">
-            <button onclick="analyserManuel()">Analyser</button>
+        <div class="grid-cotes">
+            <input type="number" id="c1" placeholder="Cote 1" step="0.01">
+            <input type="number" id="cX" placeholder="Cote X" step="0.01">
+            <input type="number" id="c2" placeholder="Cote 2" step="0.01">
         </div>
 
-        <div id="aiMode" style="display:none;">
+        <button onclick="analyserManuel()">Analyser le match</button>
+
+        <div style="margin-top:20px; border-top:1px solid #475569; padding-top:20px;">
+            <input type="password" id="apiKey" placeholder="Clé API Gemini (Optionnel)">
             <input type="file" id="imageInput" accept="image/*">
-            <button onclick="analyserImage()">Analyser le Screen</button>
+            <button onclick="analyserImage()" style="background:#10b981;">Analyser via Screen</button>
         </div>
 
-        <div id="resultat">En attente...</div>
+        <div id="resultat" class="result-box">
+            <strong>Match :</strong> En attente...<br>
+            <strong>Score probable :</strong> - <br>
+            <strong>Total Buts (2.5) :</strong> - <br>
+            <strong>Total Buts (3.5) :</strong> -
+        </div>
     </div>
 
     <script>
-        function saveKey() { localStorage.setItem('snafe_key', document.getElementById('apiKey').value); alert("Clé sauvegardée !"); }
-        function showMode(m) { document.getElementById('manualMode').style.display = (m==='manual')?'block':'none'; document.getElementById('aiMode').style.display = (m==='ai')?'block':'none'; }
-        
-        async function analyserImage() {
-            const key = localStorage.getItem('snafe_key');
-            const file = document.getElementById('imageInput').files[0];
-            if (!key || !file) { alert("Clé ou image manquante !"); return; }
+        const teams = ["Liverpool", "London Reds", "Manchester Blue", "Brighton", "Brentford", "A. Villa", "Newcastle", "Everton", "Spurs", "West Ham", "Manchester Red", "Fulham", "London Blues", "C. Palace", "N. Forest", "Wolverhampton", "Burnley", "Bournemouth", "Leeds", "Sunderland"];
+        teams.forEach(t => {
+            document.getElementById('homeTeam').innerHTML += `<option>${t}</option>`;
+            document.getElementById('awayTeam').innerHTML += `<option>${t}</option>`;
+        });
+
+        function analyserManuel() {
+            const h = document.getElementById('homeTeam').value;
+            const a = document.getElementById('awayTeam').value;
+            const c1 = parseFloat(document.getElementById('c1').value);
+            const resDiv = document.getElementById('resultat');
             
-            const genAI = new google.generativeai.GoogleGenerativeAI(key);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64Data = reader.result.split(',')[1];
-                const res = await model.generateContent(["Analyse ces résultats et donne le score et les stats.", { inlineData: { data: base64Data, mimeType: "image/png" } }]);
-                document.getElementById('resultat').innerText = res.response.text();
-            };
-            reader.readAsDataURL(file);
+            if(!c1) { alert("Entrez la cote 1"); return; }
+            
+            const score = (c1 < 1.40) ? "3-0 ou 3-1" : "1-1 ou 2-1";
+            const buts25 = (c1 < 1.40) ? "Plus de 2.5" : "Moins de 2.5";
+            const buts35 = (c1 < 1.40) ? "Plus de 3.5" : "Moins de 3.5";
+
+            resDiv.innerHTML = `<strong>Match :</strong> ${h} vs ${a}<br>
+                               <strong>Score probable :</strong> ${score}<br>
+                               <strong>Total Buts (2.5) :</strong> ${buts25}<br>
+                               <strong>Total Buts (3.5) :</strong> ${buts35}`;
         }
     </script>
 </body>
