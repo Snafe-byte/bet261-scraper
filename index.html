@@ -3,44 +3,62 @@
 <head>
     <meta charset="UTF-8">
     <title>Snafe-byte Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai@0.1.0/dist/index.min.js"></script>
     <style>
-        body { font-family: 'Segoe UI', sans-serif; background-color: #1a1a2e; color: #ffffff; padding: 20px; }
-        .box { background-color: #16213e; padding: 20px; border-radius: 12px; max-width: 450px; margin: auto; border: 1px solid #0f3460; }
-        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 6px; border: none; }
-        button { background-color: #e94560; color: white; font-weight: bold; cursor: pointer; }
-        #resultat { margin-top: 20px; padding: 15px; border-radius: 8px; background-color: #0f3460; }
-        .alerte { color: #ffeb3b; font-weight: bold; }
+        :root { --primary: #6366f1; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
+        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0f172a, #1e1b4b); color: var(--text); padding: 20px; min-height: 100vh; display: flex; justify-content: center; }
+        .dashboard { background: var(--card); padding: 20px; border-radius: 16px; width: 100%; max-width: 450px; }
+        h2 { text-align: center; color: var(--primary); }
+        .tab-btn { background: #334155; border: none; color: white; padding: 10px; width: 48%; cursor: pointer; border-radius: 5px; }
+        input, select, button { width: 100%; padding: 12px; margin: 8px 0; border-radius: 8px; border: none; background: #334155; color: white; }
+        button { background: var(--primary); font-weight: bold; cursor: pointer; }
+        #resultat { margin-top: 20px; padding: 15px; border-radius: 10px; background: #0f172a; border-left: 4px solid var(--primary); }
     </style>
 </head>
 <body>
-    <div class="box">
-        <h2>Snafe-byte Analytics</h2>
-        <select id="homeTeam"></select> vs <select id="awayTeam"></select>
-        <input type="number" id="c1" placeholder="Cote 1" step="0.01">
-        <button onclick="analyser()">Analyser le Risque</button>
-        <div id="resultat">En attente d'analyse...</div>
+    <div class="dashboard">
+        <h2>Snafe-byte Pro</h2>
+        
+        <!-- Configuration clé -->
+        <div style="background: #0f172a; padding: 10px; border-radius: 8px; margin-bottom: 10px;">
+            <input type="password" id="apiKey" placeholder="Ta clé API (enregistrée localement)">
+            <button onclick="saveKey()" style="background:#10b981;">Enregistrer la Clé</button>
+        </div>
+
+        <button class="tab-btn" onclick="showMode('manual')">Manuel</button>
+        <button class="tab-btn" onclick="showMode('ai')">AI (Screens)</button>
+
+        <div id="manualMode">
+            <input type="number" id="c1" placeholder="Cote Favori">
+            <button onclick="analyserManuel()">Analyser</button>
+        </div>
+
+        <div id="aiMode" style="display:none;">
+            <input type="file" id="imageInput" accept="image/*">
+            <button onclick="analyserImage()">Analyser le Screen</button>
+        </div>
+
+        <div id="resultat">En attente...</div>
     </div>
 
     <script>
-        const teams = ["Liverpool", "London Reds", "Manchester Blue", "Brighton", "Brentford", "A. Villa", "Newcastle", "Everton", "Spurs", "West Ham", "Manchester Red", "Fulham", "London Blues", "C. Palace", "N. Forest", "Wolverhampton", "Burnley", "Bournemouth", "Leeds", "Sunderland"];
-        teams.forEach(t => {
-            document.getElementById('homeTeam').innerHTML += `<option>${t}</option>`;
-            document.getElementById('awayTeam').innerHTML += `<option>${t}</option>`;
-        });
-
-        function analyser() {
-            const c1 = parseFloat(document.getElementById('c1').value);
-            const resDiv = document.getElementById('resultat');
+        function saveKey() { localStorage.setItem('snafe_key', document.getElementById('apiKey').value); alert("Clé sauvegardée !"); }
+        function showMode(m) { document.getElementById('manualMode').style.display = (m==='manual')?'block':'none'; document.getElementById('aiMode').style.display = (m==='ai')?'block':'none'; }
+        
+        async function analyserImage() {
+            const key = localStorage.getItem('snafe_key');
+            const file = document.getElementById('imageInput').files[0];
+            if (!key || !file) { alert("Clé ou image manquante !"); return; }
             
-            let message = "";
-            if (c1 < 1.30) {
-                message = "<span class='alerte'>⚠️ DANGER : Cote trop faible (< 1.30), risque élevé de nul ou défaite.</span><br>";
-            }
-            
-            let score = (c1 < 1.40) ? "3-0 ou 3-1" : "1-1 ou 2-1";
-            let buts = (c1 < 1.40) ? "Plus de 2.5 buts (Over)" : "Moins de 3.5 buts";
-
-            resDiv.innerHTML = `${message}<strong>Score suggéré :</strong> ${score}<br><strong>Total de buts :</strong> ${buts}`;
+            const genAI = new google.generativeai.GoogleGenerativeAI(key);
+            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+            const reader = new FileReader();
+            reader.onloadend = async () => {
+                const base64Data = reader.result.split(',')[1];
+                const res = await model.generateContent(["Analyse ces résultats et donne le score et les stats.", { inlineData: { data: base64Data, mimeType: "image/png" } }]);
+                document.getElementById('resultat').innerText = res.response.text();
+            };
+            reader.readAsDataURL(file);
         }
     </script>
 </body>
