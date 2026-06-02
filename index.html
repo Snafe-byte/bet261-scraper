@@ -2,67 +2,55 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Snafe-byte Analytics</title>
+    <title>Snafe-byte Pro Predictor</title>
     <style>
         :root { --primary: #6366f1; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
-        body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0f172a, #1e1b4b); color: var(--text); padding: 20px; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
-        .dashboard { background: var(--card); padding: 25px; border-radius: 16px; width: 100%; max-width: 450px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: var(--text); display: flex; justify-content: center; padding: 20px; }
+        .dashboard { background: var(--card); padding: 25px; border-radius: 16px; width: 100%; max-width: 400px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
         h2 { text-align: center; color: var(--primary); margin-bottom: 20px; }
-        .grid-select { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
-        .grid-cotes { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 20px; }
-        input, select, button { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #475569; background: #334155; color: white; box-sizing: border-box; }
-        button { background: var(--primary); font-weight: bold; cursor: pointer; border: none; margin-top: 10px; }
-        .result-box { margin-top: 20px; padding: 15px; border-radius: 10px; background: #0f172a; border-left: 4px solid var(--primary); }
+        input, select, button { width: 100%; padding: 12px; margin: 5px 0; border-radius: 8px; border: 1px solid #475569; background: #334155; color: white; }
+        button { background: var(--primary); font-weight: bold; cursor: pointer; border: none; }
+        .res { margin-top: 20px; padding: 15px; border-radius: 10px; background: #0f172a; font-size: 0.9em; line-height: 1.6; }
     </style>
 </head>
 <body>
     <div class="dashboard">
-        <h2>Snafe-byte Analytics</h2>
-        
-        <div class="grid-select">
-            <select id="homeTeam"></select>
-            <select id="awayTeam"></select>
-        </div>
-
-        <div class="grid-cotes">
-            <input type="number" id="c1" placeholder="Cote 1" step="0.01">
-            <input type="number" id="cX" placeholder="Cote X" step="0.01">
-            <input type="number" id="c2" placeholder="Cote 2" step="0.01">
-        </div>
-
-        <button onclick="analyser()">Analyser le match</button>
-
-        <div id="resultat" class="result-box">
-            <strong>Match :</strong> - <br>
-            <strong>Score probable :</strong> - <br>
-            <strong>Total Buts (2.5) :</strong> - <br>
-            <strong>Total Buts (3.5) :</strong> -
-        </div>
+        <h2>Snafe-byte Predictor</h2>
+        <input type="number" id="c1" placeholder="Cote 1" step="0.01">
+        <input type="number" id="cX" placeholder="Cote X" step="0.01">
+        <input type="number" id="c2" placeholder="Cote 2" step="0.01">
+        <button onclick="calculer()">Analyser la tendance</button>
+        <div id="res" class="res">Entrez les cotes pour voir l'analyse.</div>
     </div>
 
     <script>
-        const teams = ["Liverpool", "London Reds", "Manchester Blue", "Brighton", "Brentford", "A. Villa", "Newcastle", "Everton", "Spurs", "West Ham", "Manchester Red", "Fulham", "London Blues", "C. Palace", "N. Forest", "Wolverhampton", "Burnley", "Bournemouth", "Leeds", "Sunderland"];
-        teams.forEach(t => {
-            document.getElementById('homeTeam').innerHTML += `<option>${t}</option>`;
-            document.getElementById('awayTeam').innerHTML += `<option>${t}</option>`;
-        });
-
-        function analyser() {
-            const h = document.getElementById('homeTeam').value;
-            const a = document.getElementById('awayTeam').value;
+        function calculer() {
             const c1 = parseFloat(document.getElementById('c1').value);
-            const resDiv = document.getElementById('resultat');
-            
-            if(!c1) { alert("Entrez une cote 1 valide"); return; }
-            
-            const score = (c1 < 1.40) ? "3-0 ou 3-1" : "1-1 ou 2-1";
-            const buts25 = (c1 < 1.40) ? "Plus de 2.5" : "Moins de 2.5";
-            const buts35 = (c1 < 1.40) ? "Plus de 3.5" : "Moins de 3.5";
+            const cX = parseFloat(document.getElementById('cX').value);
+            const c2 = parseFloat(document.getElementById('c2').value);
+            const res = document.getElementById('res');
 
-            resDiv.innerHTML = `<strong>Match :</strong> ${h} vs ${a}<br>
-                               <strong>Score probable :</strong> ${score}<br>
-                               <strong>Total Buts (2.5) :</strong> ${buts25}<br>
-                               <strong>Total Buts (3.5) :</strong> ${buts35}`;
+            if(!c1 || !cX || !c2) { res.innerText = "Veuillez remplir les 3 cotes."; return; }
+
+            let verdict = "";
+            let risque = "";
+            let buts = "Tendance Buts : Probable Over 2.5";
+
+            // Logique basée sur tes observations de volatilité
+            if (c1 < 1.35) {
+                verdict = "Victoire Favori (High Conf)";
+                risque = "Risque Faible";
+            } else if (c1 >= 1.35 && c1 <= 1.60) {
+                verdict = "Favori Fragile (Piège)";
+                risque = "Risque Élevé - Privilégier Double Chance";
+            } else {
+                verdict = "Match Volatile";
+                risque = "Risque Très Élevé - Variance constatée";
+            }
+
+            res.innerHTML = `<strong>Analyse :</strong> ${verdict}<br>
+                             <strong>Niveau de risque :</strong> ${risque}<br>
+                             <strong>Stratégie :</strong> ${buts}`;
         }
     </script>
 </body>
