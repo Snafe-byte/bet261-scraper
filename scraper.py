@@ -1,6 +1,7 @@
 import os
 import json
 import time
+import urllib.request
 from datetime import datetime, timedelta
 from playwright.sync_api import sync_playwright
 
@@ -12,13 +13,10 @@ def fetch_with_browser():
     heure_locale = heure_madagascar.strftime("%H:%M")
     print(f"[{heure_locale}] Ouverture de Chrome virtuel (Contournement Cloudflare)...")
     
-    # URL de la ligue virtuelle en direct
     url = "https://bet261.mg/virtual/category/instant-league/8035/matches"
-    
     vrais_matchs = []
     
     with sync_playwright() as p:
-        # On lance un vrai navigateur Chrome en arrière-plan
         browser = p.chromium.launch(headless=True)
         context = browser.new_context(
             user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
@@ -26,7 +24,6 @@ def fetch_with_browser():
         )
         page = context.new_page()
         
-        # On écoute le réseau pour attraper le flux de données masqué (l'API)
         def handle_response(response):
             nonlocal vrais_matchs
             if "fixtures" in response.url or "subcategories/8035" in response.url:
@@ -63,9 +60,8 @@ def fetch_with_browser():
         page.on("response", handle_response)
         
         try:
-            # Le faux utilisateur humain navigue sur le vrai site
             page.goto(url, wait_until="networkidle", timeout=30000)
-            time.sleep(7) # Laisse le temps aux scripts de Bet261 de s'exécuter
+            time.sleep(7)
         except Exception as e:
             print(f"Erreur de navigation : {e}")
         finally:
@@ -75,10 +71,9 @@ def fetch_with_browser():
 
 def send_to_supabase(matches):
     if not matches:
-        print("Aucun match réel intercepté à cette minute. Bet261 bloque toujours ou aucun match en cours.")
+        print("Aucun match réel intercepté à cette minute.")
         return
 
-    # On garde uniquement les matchs uniques trouvés lors de l'interception
     seen = set()
     unique_matches = []
     for m in matches:
@@ -104,7 +99,6 @@ def send_to_supabase(matches):
             "status": f"En cours ({heure_match})"
         }
 
-        import urllib.request
         supabase_url = f"{SUPABASE_URL}/rest/v1/virtual_matches"
         req_url = f"{supabase_url}?match_id=eq.{match_id}"
         req_data = json.dumps(payload).encode('utf-8')
@@ -117,9 +111,51 @@ def send_to_supabase(matches):
         try:
             with urllib.request.urlopen(req) as _:
                 print(f"Vrai match enregistré : {teams}")
+        except Exception:
+            pass
+
+def clean_old_matches():
+    """Supprime les matchs terminés ou en cours qui ont été créés il y a plus de 5 minutes"""
+    print("Nettoyage des anciens matchs (plus de 5 minutes)...")
+    
+    # 1. Calculer l'heure limite (Maintenant - 5 minutes) à Madagascar
+    heure_madagascar = datetime.utcnow() + timedelta(hours=3)
+    heure_limite = heure_madagascar - timedelta(minutes=5)
+    
+    # On va lister les 10 dernières minutes à supprimer pour être sûr de ne rien rater
+    minutes_a_supprimer = []
+    for i in range(5, 20): # Supprime tout ce qui a entre 5 et 20 minutes d'ancienneté
+        minutes_a_supprimer.append((heure_madagascar - timedelta(minutes=i)).strftime("%H:%M"))
+
+    for heure_cible in minutes_a_supprimer:
+        # Ordre de suppression basé sur la mention de l'heure dans la colonne 'status'
+        # Exemple : Supprime si le statut contient '(18:05)'
+        status_recherche = f"%({heure_cible})%"
+        
+        # Encodage de l'URL pour Supabase
+        url_encoded = urllib.parse.quote(status_recherche)
+        delete_url = f"{SUPABASE_URL}/rest/v1/virtual_matches?status=like.{url_encoded}"
+        
+        req = urllib.request.Request(
+            delete_url,
+            headers={
+                'apikey': SUPABASE_KEY,
+                'Authorization': f'Bearer {SUPABASE_KEY}'
+            },
+            method='DELETE'
+        )
+        try:
+            with urllib.request.urlopen(req) as _:
+                pass
         except Exception as e:
-            print(f"Erreur Supabase : {e}")
+            print(f"Erreur lors du nettoyage pour l'heure {heure_cible} : {e}")
+            
+    print("Nettoyage terminé. La base de données est propre !")
 
 if __name__ == "__main__":
+    # Étape 1 : Récupérer et envoyer les nouveaux matchs
     matches, heure = fetch_with_browser()
     send_to_supabase(matches)
+    
+    # Étape 2 : Supprimer automatiquement les matchs vieux de plus de 5 minutes
+    clean_old_matches()
