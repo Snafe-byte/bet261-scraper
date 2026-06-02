@@ -2,9 +2,7 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
-    <title>Snafe-byte Pro</title>
-    <!-- Utilisation du SDK Google Generative AI via un script global -->
-    <script src="https://cdn.jsdelivr.net/npm/@google/generative-ai@0.21.0/dist/index.min.js"></script>
+    <title>Snafe-byte Analytics</title>
     <style>
         :root { --primary: #6366f1; --bg: #0f172a; --card: #1e293b; --text: #f8fafc; }
         body { font-family: 'Segoe UI', sans-serif; background: linear-gradient(135deg, #0f172a, #1e1b4b); color: var(--text); padding: 20px; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
@@ -32,14 +30,7 @@
             <input type="number" id="c2" placeholder="Cote 2" step="0.01">
         </div>
 
-        <button onclick="analyserManuel()">Analyser le match</button>
-
-        <div style="margin-top:20px; border-top:1px solid #475569; padding-top:20px;">
-            <input type="password" id="apiKey" placeholder="Clé API Gemini">
-            <button onclick="saveKey()" style="background:#475569; margin-top:5px;">Enregistrer la Clé</button>
-            <input type="file" id="imageInput" accept="image/*" style="margin-top:10px;">
-            <button onclick="analyserImage()" style="background:#10b981;">Analyser via Screen</button>
-        </div>
+        <button onclick="analyser()">Analyser le match</button>
 
         <div id="resultat" class="result-box">
             <strong>Match :</strong> - <br>
@@ -56,36 +47,22 @@
             document.getElementById('awayTeam').innerHTML += `<option>${t}</option>`;
         });
 
-        function saveKey() {
-            localStorage.setItem('snafe_key', document.getElementById('apiKey').value);
-            alert("Clé enregistrée localement !");
-        }
-
-        function analyserManuel() {
+        function analyser() {
             const h = document.getElementById('homeTeam').value;
             const a = document.getElementById('awayTeam').value;
             const c1 = parseFloat(document.getElementById('c1').value);
             const resDiv = document.getElementById('resultat');
-            if(!c1) { alert("Entrez la cote 1"); return; }
-            const score = (c1 < 1.40) ? "3-0 ou 3-1" : "1-1 ou 2-1";
-            resDiv.innerHTML = `<strong>Match :</strong> ${h} vs ${a}<br><strong>Score probable :</strong> ${score}<br><strong>Total Buts (2.5) :</strong> ${c1 < 1.40 ? "Plus de 2.5" : "Moins de 2.5"}<br><strong>Total Buts (3.5) :</strong> ${c1 < 1.40 ? "Plus de 3.5" : "Moins de 3.5"}`;
-        }
-
-        async function analyserImage() {
-            const key = localStorage.getItem('snafe_key');
-            const file = document.getElementById('imageInput').files[0];
-            if (!key || !file) { alert("Clé ou image manquante !"); return; }
             
-            // Correction : Utilisation de l'objet global généré par le CDN
-            const genAI = new window.google.generativeai.GoogleGenerativeAI(key);
-            const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
-            const reader = new FileReader();
-            reader.onloadend = async () => {
-                const base64Data = reader.result.split(',')[1];
-                const res = await model.generateContent(["Analyse ces résultats de match et donne le score et les stats.", { inlineData: { data: base64Data, mimeType: "image/png" } }]);
-                document.getElementById('resultat').innerHTML = res.response.text();
-            };
-            reader.readAsDataURL(file);
+            if(!c1) { alert("Entrez une cote 1 valide"); return; }
+            
+            const score = (c1 < 1.40) ? "3-0 ou 3-1" : "1-1 ou 2-1";
+            const buts25 = (c1 < 1.40) ? "Plus de 2.5" : "Moins de 2.5";
+            const buts35 = (c1 < 1.40) ? "Plus de 3.5" : "Moins de 3.5";
+
+            resDiv.innerHTML = `<strong>Match :</strong> ${h} vs ${a}<br>
+                               <strong>Score probable :</strong> ${score}<br>
+                               <strong>Total Buts (2.5) :</strong> ${buts25}<br>
+                               <strong>Total Buts (3.5) :</strong> ${buts35}`;
         }
     </script>
 </body>
