@@ -1,167 +1,110 @@
 import os
 import json
-import urllib.request
+import time
 from datetime import datetime, timedelta
+from playwright.sync_api import sync_playwright
 
-# Récupération des clés Supabase
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
-def fetch_bet261_virtuals():
+def fetch_with_browser():
     heure_madagascar = datetime.utcnow() + timedelta(hours=3)
     heure_locale = heure_madagascar.strftime("%H:%M")
-    print(f"[{heure_locale}] Tentative de connexion forcée aux vrais matchs Bet261...")
+    print(f"[{heure_locale}] Ouverture de Chrome virtuel (Contournement Cloudflare)...")
     
-    # URL directe de l'API de l'Instant League
-    url = "https://bet261.mg/api/sports/virtual/subcategories/8035/fixtures"
+    # URL de la ligue virtuelle en direct
+    url = "https://bet261.mg/virtual/category/instant-league/8035/matches"
     
-    # En-têtes ultra-complets imitant un téléphone Android à Antananarivo
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36',
-        'Accept': 'application/json, text/plain, */*',
-        'Accept-Language': 'fr-FR,fr;q=0.9',
-        'X-Requested-With': 'XMLHttpRequest',
-        'Origin': 'https://bet261.mg',
-        'Referer': 'https://bet261.mg/virtual/category/instant-league/8035/matches',
-        'Connection': 'keep-alive'
-    }
+    vrais_matchs = []
     
-    try:
-        req = urllib.request.Request(url, headers=headers)
-        with urllib.request.urlopen(req, timeout=15) as response:
-            data = json.loads(response.read().decode('utf-8'))
-            
-            # Analyse de la structure dynamique de Bet261
-            raw_fixtures = data.get("data", []) or data.get("fixtures", []) or data
-            if not isinstance(raw_fixtures, list) and isinstance(data, dict):
-                # Si les données sont imbriquées différemment
-                raw_fixtures = data.get("result", {}).get("rows", [])
-            
-            print(f"[{heure_locale}] Connexion réussie ! Vrais matchs trouvés : {len(raw_fixtures)}")
-            
-            cleaned_matches = []
-            for idx, match in enumerate(raw_fixtures):
-                match_id = match.get("id") or match.get("fixtureId") or f"live_{idx}_{heure_locale.replace(':', '')}"
-                
-                # Extraction robuste des noms d'équipes
-                home = "Équipe A"
-                away = "Équipe B"
-                if isinstance(match.get("homeTeam"), dict):
-                    home = match.get("homeTeam", {}).get("name", "Équipe A")
-                else:
-                    home = match.get("homeTeam", "Équipe A")
-                    
-                if isinstance(match.get("awayTeam"), dict):
-                    away = match.get("awayTeam", {}).get("name", "Équipe B")
-                else:
-                    away = match.get("awayTeam", "Équipe B")
-                
-                # Gestion des cotes
-                odds = {"home": 2.00, "draw": 3.00, "away": 2.00}
-                odds_list = match.get("odds", []) or []
-                for market in odds_list:
-                    if any(x in market.get("name", "") for x in ["1X2", "Match Result", "Résultat"]):
-                        for outcome in market.get("outcomes", []):
-                            n = str(outcome.get("name", ""))
-                            if n == "1" or "home" in n.lower(): odds["home"] = float(outcome.get("value", 2.00))
-                            elif n.lower() == "x" or "draw" in n.lower(): odds["draw"] = float(outcome.get("value", 3.00))
-                            elif n == "2" or "away" in n.lower(): odds["away"] = float(outcome.get("value", 2.00))
-                
-                cleaned_matches.append({
-                    "id": match_id,
-                    "teams": f"{home} vs {away}",
-                    "odds": odds,
-                    "heure": heure_locale
-                })
-            
-            if cleaned_matches:
-                return cleaned_matches
-            else:
-                raise Exception("Données vides reçues")
-
-    except Exception as e:
-        print(f"Blocage Bet261 actif ({e}). Utilisation du générateur dynamique temps réel.")
-        # Pour éviter les doublons bloquants, on crée des équipes virtuelles réalistes qui changent TOUTES les 2 minutes
-        import random
-        equipes_locales = ["Mamelodi Sundowns", "Al Ahly", "TP Mazembe", "Raja Casablanca", "Esperance Tunis", "JS Kabylie", "Wydad", "Zamalek", "Orlando Pirates", "Kaizer Chiefs"]
-        random.shuffle(equipes_locales)
+    with sync_playwright() as p:
+        # On lance un vrai navigateur Chrome en arrière-plan
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+            viewport={"width": 1280, "height": 720}
+        )
+        page = context.new_page()
         
-        return [
-            {"id": f"8035_{heure_locale.replace(':', '')}_1", "teams": f"{equipes_locales[0]} (V) vs {equipes_locales[1]} (V)", "odds": {"home": round(random.uniform(1.5, 3.5), 2), "draw": round(random.uniform(2.8, 3.8), 2), "away": round(random.uniform(2.0, 4.5), 2)}, "heure": heure_locale},
-            {"id": f"8035_{heure_locale.replace(':', '')}_2", "teams": f"{equipes_locales[2]} (V) vs {equipes_locales[3]} (V)", "odds": {"home": round(random.uniform(1.5, 3.5), 2), "draw": round(random.uniform(2.8, 3.8), 2), "away": round(random.uniform(2.0, 4.5), 2)}, "heure": heure_locale}
-        ]
+        # On écoute le réseau pour attraper le flux de données masqué (l'API)
+        def handle_response(response):
+            nonlocal vrais_matchs
+            if "fixtures" in response.url or "subcategories/8035" in response.url:
+                try:
+                    if response.status == 200:
+                        data = response.json()
+                        raw_fixtures = data.get("data", []) or data.get("fixtures", []) or data
+                        
+                        for match in raw_fixtures:
+                            match_id = match.get("id") or match.get("fixtureId")
+                            home = match.get("homeTeam", {}).get("name") if isinstance(match.get("homeTeam"), dict) else match.get("homeTeam")
+                            away = match.get("awayTeam", {}).get("name") if isinstance(match.get("awayTeam"), dict) else match.get("awayTeam")
+                            
+                            if home and away:
+                                odds_list = match.get("odds", []) or []
+                                odds = {"home": 2.0, "draw": 3.0, "away": 2.0}
+                                for market in odds_list:
+                                    if any(x in market.get("name", "") for x in ["1X2", "Match Result"]):
+                                        for outcome in market.get("outcomes", []):
+                                            n = str(outcome.get("name", ""))
+                                            if n == "1" or "home" in n.lower(): odds["home"] = float(outcome.get("value"))
+                                            elif n.lower() == "x" or "draw" in n.lower(): odds["draw"] = float(outcome.get("value"))
+                                            elif n == "2" or "away" in n.lower(): odds["away"] = float(outcome.get("value"))
+                                
+                                vrais_matchs.append({
+                                    "id": match_id,
+                                    "teams": f"{home} vs {away}",
+                                    "odds": odds,
+                                    "heure": heure_locale
+                                })
+                except Exception:
+                    pass
 
-def check_and_update_results():
-    print("Mise à jour et calcul des résultats en cours...")
-    
-    # Demander à Supabase les matchs en cours qui n'ont pas encore de score définitif
-    supabase_url = f"{SUPABASE_URL}/rest/v1/virtual_matches?status=like.En%20cours*"
-    req = urllib.request.Request(
-        supabase_url,
-        headers={'apikey': SUPABASE_KEY, 'Authorization': f'Bearer {SUPABASE_KEY}'},
-        method='GET'
-    )
-    
-    try:
-        with urllib.request.urlopen(req) as response:
-            pending_matches = json.loads(response.read().decode('utf-8'))
-            print(f"Matchs en attente de score trouvés dans Supabase : {len(pending_matches)}")
+        page.on("response", handle_response)
+        
+        try:
+            # Le faux utilisateur humain navigue sur le vrai site
+            page.goto(url, wait_until="networkidle", timeout=30000)
+            time.sleep(7) # Laisse le temps aux scripts de Bet261 de s'exécuter
+        except Exception as e:
+            print(f"Erreur de navigation : {e}")
+        finally:
+            browser.close()
             
-            for match in pending_matches:
-                match_id = str(match.get("match_id"))
-                prediction = match.get("prediction", "")
-                
-                # Génération d'un vrai score aléatoire de match de football terminé
-                import random
-                sh = random.choice([0, 1, 2, 3, 4])
-                sa = random.choice([0, 1, 2, 3])
-                score = f"{sh}-{sa}"
-                
-                # Détermination du résultat
-                if sh > sa: resultat_reel = "Victoire Domicile"
-                elif sa > sh: resultat_reel = "Victoire À l'extérieur"
-                else: resultat_reel = "Match serré / Double Chance"
-                
-                # Vérification du prono
-                status_ia = "❌ Perdu"
-                if "Victoire Domicile" in prediction and resultat_reel == "Victoire Domicile": status_ia = "✅ Gagné !"
-                elif "Victoire À l'extérieur" in prediction and resultat_reel == "Victoire À l'extérieur": status_ia = "✅ Gagné !"
-                elif "Match serré" in prediction or "Double Chance" in prediction: status_ia = "✅ Gagné !"
-
-                # Envoi de la mise à jour à Supabase
-                update_payload = {"status": f"Terminé ({score}) - {status_ia}"}
-                update_url = f"{SUPABASE_URL}/rest/v1/virtual_matches?match_id=eq.{match_id}"
-                
-                req_update = urllib.request.Request(
-                    update_url,
-                    data=json.dumps(update_payload).encode('utf-8'),
-                    headers={'apikey': SUPABASE_KEY, 'Authorization': f'Bearer {SUPABASE_KEY}', 'Content-Type': 'application/json'},
-                    method='PATCH'
-                )
-                with urllib.request.urlopen(req_update) as _:
-                    print(f"Match {match_id} mis à jour avec succès : {score}")
-                    
-    except Exception as e:
-        print(f"Erreur lors de la mise à jour : {e}")
+    return vrais_matchs, heure_locale
 
 def send_to_supabase(matches):
-    if not matches: return
-    for match in matches:
+    if not matches:
+        print("Aucun match réel intercepté à cette minute. Bet261 bloque toujours ou aucun match en cours.")
+        return
+
+    # On garde uniquement les matchs uniques trouvés lors de l'interception
+    seen = set()
+    unique_matches = []
+    for m in matches:
+        if m["id"] not in seen:
+            seen.add(m["id"])
+            unique_matches.append(m)
+
+    for match in unique_matches:
         match_id = match.get("id")
         teams = match.get("teams")
         odds = match.get("odds", {})
         heure_match = match.get("heure")
+        
+        prediction = "Victoire Domicile" if odds["home"] < odds["away"] else "Match serré / Double Chance"
 
         payload = {
             "match_id": str(match_id),
             "teams": teams,
-            "odds_home": odds.get("home"),
-            "odds_draw": odds.get("draw"),
-            "odds_away": odds.get("away"),
-            "prediction": f"Gemini IA : {'Victoire Domicile' if odds.get('home',0) < odds.get('away',0) else 'Match serré / Double Chance'}",
+            "odds_home": odds["home"],
+            "odds_draw": odds["draw"],
+            "odds_away": odds["away"],
+            "prediction": f"Gemini IA : {prediction}",
             "status": f"En cours ({heure_match})"
         }
 
+        import urllib.request
         supabase_url = f"{SUPABASE_URL}/rest/v1/virtual_matches"
         req_url = f"{supabase_url}?match_id=eq.{match_id}"
         req_data = json.dumps(payload).encode('utf-8')
@@ -172,10 +115,11 @@ def send_to_supabase(matches):
             method='POST'
         )
         try:
-            with urllib.request.urlopen(req) as _: pass
-        except Exception: pass
+            with urllib.request.urlopen(req) as _:
+                print(f"Vrai match enregistré : {teams}")
+        except Exception as e:
+            print(f"Erreur Supabase : {e}")
 
 if __name__ == "__main__":
-    matches = fetch_bet261_virtuals()
+    matches, heure = fetch_with_browser()
     send_to_supabase(matches)
-    check_and_update_results()
