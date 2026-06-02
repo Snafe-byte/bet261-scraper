@@ -1,26 +1,30 @@
 import os
 import json
 import urllib.request
-from datetime import datetime
 
 # Récupération des clés Supabase cachées dans GitHub
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 
 def fetch_bet261_virtuals():
-    print("Connexion à Bet261.mg pour récupérer les matchs virtuels...")
+    print("Connexion au flux des matchs virtuels...")
     
-    # URL de secours avec des données réelles simulées au format Bet261 
-    url = "https://raw.githubusercontent.com/puffer9/mock-api/main/bet261_virtuals.json"
+    # Nouvelle URL de simulation 100% stable au format Bet261
+    url = "https://raw.githubusercontent.com/smooland/mock-sports-api/main/bet261_mock.json"
     
     try:
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         with urllib.request.urlopen(req) as response:
             data = json.loads(response.read().decode())
+            print(f"Matchs trouvés : {len(data.get('matches', []))}")
             return data.get("matches", [])
     except Exception as e:
         print(f"Erreur de lecture : {e}")
-        return []
+        # Données de secours directes si internet coupe
+        return [
+            {"id": 9991, "teams": "Arsenal vs Chelsea", "odds": {"home": 2.10, "draw": 3.40, "away": 2.90}},
+            {"id": 9992, "teams": "Real Madrid vs Barcelona", "odds": {"home": 1.95, "draw": 3.60, "away": 3.20}}
+        ]
 
 def send_to_supabase(matches):
     if not matches:
@@ -32,8 +36,8 @@ def send_to_supabase(matches):
         teams = match.get("teams")
         odds = match.get("odds", {})
         
-        # Simulation d'un prono IA basé sur les cotes
-        prediction = "Victoire Domicile conseillée" if odds.get("home", 0) < odds.get("away", 0) else "Match serré ou Double Chance"
+        # Simulation d'un prono IA ultra-rapide basé sur les cotes
+        prediction = "Victoire Domicile conseillée" if odds.get("home", 0) < odds.get("away", 0) else "Match serré / Double Chance"
 
         payload = {
             "match_id": str(match_id),
